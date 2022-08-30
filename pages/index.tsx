@@ -2,8 +2,92 @@ import type { NextPage } from 'next'
 import Head from 'next/head'
 import Image from 'next/image'
 import styles from '../styles/Home.module.css'
+import { useState } from 'react';
+import Arweave from 'arweave';
+import Arfund, { createPool, read } from "arfunds";
+import PoolModal from './components/PoolModal'
+import {
+  Tooltip,
+  FormControl,
+  FormLabel,
+  FormErrorMessage,
+  Input,
+  Textarea,
+  HStack,
+  Button,
+  Center,
+  VStack,
+  Text,
+  Link,
+  Box,
+  Spinner,
+  useDisclosure
+} from '@chakra-ui/react';
+import { QuestionOutlineIcon, ExternalLinkIcon } from '@chakra-ui/icons';
 
 const Home: NextPage = () => {
+  const poolObject = {}
+  const [noWallet, setNoWallet] = useState(false)
+  const [noDescription, setNoDescription] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [data, setData] = useState()
+  const { onOpen } = useDisclosure()
+
+  const arweave = Arweave.init({
+    host: "arweave.net",
+    port: 443,
+    protocol: "https",
+    timeout: 20000,
+    logging: false,
+  });
+
+
+  const handleChange = (e) => {
+    poolObject[e.target.name] = e.target.value
+  }
+
+  const handlePoolCreate = async (e) => {
+    e.preventDefault()
+
+    const {
+      title,
+      description,
+      website,
+      wallet,
+      operatorInfo,
+      rewards
+    } = poolObject;
+
+    try {
+      if (validateFormInput(wallet, description)) return
+      setLoading(true)
+      const txId = await createPool(arweave, title, description, "use_wallet", wallet, website, operatorInfo, rewards);
+      const fund = new Arfund(txId, arweave, true);
+
+      if (fund && fund.poolId) {
+        setData([poolObject, fund.poolId])
+        setLoading(false)
+        onOpen()
+      }
+    } catch (error) {
+      console.log(error)
+      setData({ error: error.message })
+      onOpen()
+    }
+  }
+
+  const validateFormInput = (wallet, description) => {
+    let anyInvalid = false
+    if (wallet === undefined) {
+      setNoWallet(true);
+      anyInvalid = true
+    }
+    if (description === undefined) {
+      setNoDescription(true)
+      anyInvalid = true
+    }
+    return anyInvalid
+  }
   return (
     <div className={styles.container}>
       <Head>
@@ -12,46 +96,87 @@ const Home: NextPage = () => {
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <main className={styles.main}>
-        <h1 className={styles.title}>
-          Welcome to <a href="https://nextjs.org">Next.js!</a>
-        </h1>
-
-        <p className={styles.description}>
-          Get started by editing{' '}
-          <code className={styles.code}>pages/index.tsx</code>
-        </p>
-
-        <div className={styles.grid}>
-          <a href="https://nextjs.org/docs" className={styles.card}>
-            <h2>Documentation &rarr;</h2>
-            <p>Find in-depth information about Next.js features and API.</p>
-          </a>
-
-          <a href="https://nextjs.org/learn" className={styles.card}>
-            <h2>Learn &rarr;</h2>
-            <p>Learn about Next.js in an interactive course with quizzes!</p>
-          </a>
-
-          <a
-            href="https://github.com/vercel/next.js/tree/canary/examples"
-            className={styles.card}
-          >
-            <h2>Examples &rarr;</h2>
-            <p>Discover and deploy boilerplate example Next.js projects.</p>
-          </a>
-
-          <a
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            className={styles.card}
-          >
-            <h2>Deploy &rarr;</h2>
-            <p>
-              Instantly deploy your Next.js site to a public URL with Vercel.
-            </p>
-          </a>
-        </div>
-      </main>
+      <>
+        <Center mt={20} mb='10' maxH={'75vh'}>
+          {loading ?
+            <Center h={'410px'}>
+              <VStack>
+                <Spinner size='xl' color='blue.400' />
+              </VStack>
+            </Center>
+            :
+            <>
+              <VStack px={16} pt={8}>
+                <FormControl>
+                  <FormLabel fontSize='xl'>Pool Title</FormLabel>
+                  <HStack>
+                    <Input type='text' name='title' onChange={(e) => handleChange(e)} />
+                  </HStack>
+                </FormControl>
+                <FormControl isInvalid={noDescription}>
+                  <HStack pt={1.5}>
+                    <FormLabel fontSize='xl'>Description</FormLabel>
+                    <Tooltip
+                      label={<DescriptionLabel />}
+                      fontSize='md'
+                    >
+                      <QuestionOutlineIcon color='blue' />
+                    </Tooltip>
+                  </HStack>
+                  <Textarea name='description' onChange={(e) => handleChange(e)} w='30rem' h='32vh' />
+                  <Box>
+                    {noDescription && <FormErrorMessage>Description is required.</FormErrorMessage>}
+                  </Box>
+                </FormControl>
+              </VStack>
+              <VStack px={16} w={'xl'}>
+                <FormControl>
+                  <FormLabel fontSize='xl'>Website</FormLabel>
+                  <HStack>
+                    <Input type='text' name='website' onChange={(e) => handleChange(e)} />
+                  </HStack>
+                </FormControl>
+                <FormControl isInvalid={noWallet} id='wallet'>
+                  <HStack>
+                    <FormLabel fontSize='xl' pt={1.5}>Wallet</FormLabel>
+                    <Tooltip
+                      label={<WalletLabel />}
+                    >
+                      <QuestionOutlineIcon color='blue' />
+                    </Tooltip>
+                  </HStack>
+                  <Input type='text' name='wallet' onChange={(e) => handleChange(e)} />
+                  <Box>
+                    {noWallet && <FormErrorMessage>Arwallet address is required.</FormErrorMessage>}
+                  </Box>
+                </FormControl>
+                <FormControl>
+                  <FormLabel fontSize='xl'>Operator Info</FormLabel>
+                  <Input type='text' name='operatorInfo' onChange={(e) => handleChange(e)} />
+                </FormControl>
+                <FormControl>
+                  <FormLabel fontSize='xl'>Rewards</FormLabel>
+                  <Input type='text' name='rewards' onChange={(e) => handleChange(e)} />
+                </FormControl>
+              </VStack>
+            </>
+          }
+        </Center>
+        <VStack p={12}>
+          <Button mt={8} onClick={(e) => handlePoolCreate(e)} px={8} mx={12} size='auto' fontSize='3rem' bg={'#eee'} border={'1px solid black'} _hover={{ bg: '#fff' }}>
+            {loading ? "Creating...." : "Create Pool"}
+          </Button>
+          <Box pt={12}>
+            <Text fontSize='xs'>Fill all fields to create a pool</Text>
+            <Text fontSize='xs'>You can get an ArConnect wallet from <Link href='https://www.arconnect.io/' isExternal>here <ExternalLinkIcon /></Link></Text>
+          </Box>
+        </VStack>
+        {/* This needs to be replaced with REAL value. This is currently first index of ALL contracts */}
+        {data && <PoolModal data={data} loading={loading} />}
+        <Center bg='#eee' position='fixed' bottom='0' left='0' w='100%'>
+          <footer>Heroes of History - 2022</footer>
+        </Center>
+      </>
 
       <footer className={styles.footer}>
         <a
@@ -66,6 +191,27 @@ const Home: NextPage = () => {
         </a>
       </footer>
     </div>
+  )
+}
+
+const DescriptionLabel = () => {
+  return (
+    <div>
+      <p>This description should include:</p>
+      <p>• Here</p>
+      <p>• Goes</p>
+      <p>• What is needed for description</p>
+    </div >
+  )
+}
+
+const WalletLabel = () => {
+  return (
+    <div>
+      <p>This description should include:</p>
+      <Text fontSize='xs'>• To instantiate a pool, you must have an Arconnect address with 0 funds on it.</Text>
+      <Text fontSize='xs'>• Paste the address into the <Link href='#wallet'>field</Link></Text>
+    </div >
   )
 }
 
