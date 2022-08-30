@@ -4,7 +4,7 @@ import Image from 'next/image'
 import styles from '../styles/Home.module.css'
 import { useState } from 'react';
 import Arweave from 'arweave';
-import Arfund, { createPool, read } from "arfunds";
+import Arfund, { createPool } from "arfunds";
 import PoolModal from './components/PoolModal'
 import {
   Tooltip,
@@ -25,12 +25,16 @@ import {
 } from '@chakra-ui/react';
 import { QuestionOutlineIcon, ExternalLinkIcon } from '@chakra-ui/icons';
 
+interface PoolObject {
+  [key: string]: any;
+}
+
 const Home: NextPage = () => {
-  const poolObject = {}
-  const [noWallet, setNoWallet] = useState(false)
-  const [noDescription, setNoDescription] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [data, setData] = useState()
+  let poolObject: PoolObject;
+  const [noWallet, setNoWallet] = useState<boolean>(false)
+  const [noDescription, setNoDescription] = useState<boolean>(false)
+  const [loading, setLoading] = useState<boolean>(false)
+  const [data, setData] = useState<any>()
   const { onOpen } = useDisclosure()
 
   const arweave = Arweave.init({
@@ -42,13 +46,12 @@ const Home: NextPage = () => {
   });
 
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement> | React.ChangeEvent<HTMLTextAreaElement>): void => {
     poolObject[e.target.name] = e.target.value
   }
 
-  const handlePoolCreate = async (e) => {
+  const handlePoolCreate = async (e: any) => {
     e.preventDefault()
-
     const {
       title,
       description,
@@ -71,12 +74,12 @@ const Home: NextPage = () => {
       }
     } catch (error) {
       console.log(error)
-      setData({ error: error.message })
+      setData({ error: error })
       onOpen()
     }
   }
 
-  const validateFormInput = (wallet, description) => {
+  const validateFormInput = (wallet: string, description: string) => {
     let anyInvalid = false
     if (wallet === undefined) {
       setNoWallet(true);
@@ -177,19 +180,6 @@ const Home: NextPage = () => {
           <footer>Heroes of History - 2022</footer>
         </Center>
       </>
-
-      <footer className={styles.footer}>
-        <a
-          href="https://vercel.com?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Powered by{' '}
-          <span className={styles.logo}>
-            <Image src="/vercel.svg" alt="Vercel Logo" width={72} height={16} />
-          </span>
-        </a>
-      </footer>
     </div>
   )
 }

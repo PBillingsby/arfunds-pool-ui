@@ -88,7 +88,6 @@ const PoolModal = (props) => {
             }
           </ModalFooter>
         </ModalContent>
-        }
       </Modal>
       }
     </>
